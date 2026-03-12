@@ -337,6 +337,7 @@ Verifiziert durch Realtest:
 - der gruene Marker wandert konsistent mit
 - `T` unten rechts wird passend aktualisiert
 - `Alt + Shift + Wheel` erlaubt feinere horizontale Verschiebungen
+- `Middle Drag` funktioniert stabil als reines horizontales Panning
 
 Umgesetzte Belegungen:
 
@@ -408,10 +409,33 @@ Noch nicht umgesetzt:
 - `Alt + Wheel`
 - Zoom-to-rectangle / rechteckige Auswahl auf dem Hauptchart
 - sauberer, expliziter "Viewport reset"-Shortcut fuer die neuen Gesten
-- `Middle Drag` fuer Panning
-- `Shift + Middle Drag` fuer horizontale Skalierung
+- vertikales Panning per `Middle Drag`
+- `Shift + Middle Drag` fuer feingranulare horizontale Skalierung
 - separate, komplett kontinuierliche Offline-Ansicht nur fuer gestoppte Daten
 - Trackpad-freundliche Alternative zur mittleren Maustaste
+
+### Erkenntnis zu `Middle Drag`
+
+Ein Zwischenstand hatte `Middle Drag` so umgesetzt, dass vertikale Mausbewegungen
+den Kanal-`pos0` bzw. den vertikalen Kanal-Offset veraenderten.
+
+Das war aus UI-Sicht falsch:
+
+- die grünen Horizontal-Linien und deren Spannungslabels blieben an ihrer
+  Bildschirmposition
+- nur die numerischen Werte wurden neu berechnet
+- das Verhalten entsprach also einer Kanal-/Referenzverschiebung, nicht einem
+  Viewport-Pan
+
+Deshalb wurde der vertikale Anteil wieder entfernt.
+
+Aktueller Stand:
+
+- `Middle Drag` = **nur horizontales Panning**
+
+Wenn spaeter vertikales Panning gewuenscht ist, braucht es einen echten
+Viewport-/View-Transform-Ansatz und nicht das Wiederverwenden der bestehenden
+`pos0`-Kanalverschiebung.
 
 Empfohlene naechste Schritte:
 
