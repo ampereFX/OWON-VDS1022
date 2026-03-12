@@ -338,6 +338,9 @@ Verifiziert durch Realtest:
 - `T` unten rechts wird passend aktualisiert
 - `Alt + Shift + Wheel` erlaubt feinere horizontale Verschiebungen
 - `Middle Drag` funktioniert stabil als reines horizontales Panning
+- `Shift + Middle Drag` funktioniert als erster Continuous-Zoom-Prototyp im Stop-Modus
+- die Skalierung erfolgt ueber vertikale Mausbewegung, nicht ueber links/rechts
+- eine zu enge erste Zoom-Grenze wurde bereits erweitert
 
 Umgesetzte Belegungen:
 
@@ -410,7 +413,8 @@ Noch nicht umgesetzt:
 - Zoom-to-rectangle / rechteckige Auswahl auf dem Hauptchart
 - sauberer, expliziter "Viewport reset"-Shortcut fuer die neuen Gesten
 - vertikales Panning per `Middle Drag`
-- `Shift + Middle Drag` fuer feingranulare horizontale Skalierung
+- Verbesserung des Zoom-Ankerpunkts bei `Shift + Middle Drag`
+- Absicherung, dass `ms/div` und Raster bei Continuous Zoom semantisch sauber zusammenpassen
 - separate, komplett kontinuierliche Offline-Ansicht nur fuer gestoppte Daten
 - Trackpad-freundliche Alternative zur mittleren Maustaste
 
