@@ -300,21 +300,52 @@ Wichtige Erkenntnisse:
 
 Die Klasse `ChartScreenMouseGesture` wurde erweitert.
 
+### Stabiler Minimalstand nach Rollback und Neuansatz
+
+Nach dem fehlgeschlagenen ersten Versuch wurde die App-JAR vollstaendig auf das
+Backup zurueckgesetzt und anschliessend nur **ein einzelner, kleiner Patch**
+neu aufgebaut.
+
+Der funktionierende Minimalpatch aendert ausschliesslich:
+
+- `ChartScreenMouseGesture.mouseWheelMoved(...)`
+
+Und zwar nur fuer:
+
+- `Shift + Wheel`
+- `Alt + Shift + Wheel`
+
+Technischer Ansatz:
+
+- **kein** Patch mehr in `DataHouse`
+- **kein** Patch mehr in `WaveFormManager`
+- **kein** Patch mehr in der TimeScope-/Render-Gate-Logik
+- horizontales Panning laeuft stattdessen ueber denselben UI-Pfad wie die
+  funktionierenden Tastaturbefehle:
+  `DetailPane.getHorizontalTriggerPosition()` ->
+  `DetailPane.setHorizontalTriggerPosition(...)`
+
+Das ist wichtig, weil damit exakt der bereits vorhandene und im Original
+funktionierende Horizontal-Trigger-/Panning-Mechanismus genutzt wird, statt
+neue Transformationslogik in die Render-Schicht einzubauen.
+
+Verifiziert durch Realtest:
+
+- App startet normal
+- Samples werden normal angezeigt
+- `Shift + Wheel` verschiebt im Stop-Modus direkt die sichtbaren Samples
+- der gruene Marker wandert konsistent mit
+- `T` unten rechts wird passend aktualisiert
+- `Alt + Shift + Wheel` erlaubt feinere horizontale Verschiebungen
+
 Umgesetzte Belegungen:
 
 - Wheel:
   - unveraendert: Haupt-Timebase wechseln
 - `Shift + Wheel`:
   - horizontales Panning
-- `Alt + Wheel`:
-  - vorhandene Zoom-Assist-Logik verwenden
 - `Alt + Shift + Wheel`:
   - feinere horizontale Verschiebung
-- `Middle Drag` auf dem Hauptchart:
-  - horizontales Panning
-  - vertikale Verschiebung des naheliegenden Kanals
-- `Shift + Middle Drag` auf dem Hauptchart:
-  - horizontale Skalierung ueber die vorhandene Zoom-Assist-Logik
 
 ### Wichtige technische Erkenntnis nach dem ersten Realtest
 
@@ -344,34 +375,26 @@ in der Render-/Transform-Gate-Logik:
 Deshalb wurde im Stop-Zustand zwar der Trigger-Offset geaendert, aber die
 Wellenform blieb auf ihrer alten X-Transformation stehen.
 
-### Nachtraeglicher Fix in dieser Session
+### Fehlansatz aus dem ersten Versuch
 
-Ergaenzt/angepasst:
+Im ersten Versuch wurden zusaetzlich folgende Kernklassen veraendert:
 
-- `DataHouse.allowTransformScreenWaveFormHorizontal()`
-- `WaveFormManager.allowScreenWaveFormTransform()`
-- `WaveFormManager.addWaveFormsRTXloc(...)`
-- `WaveFormManager.setWaveFormTimebaseRTIndex(...)`
+- `DataHouse`
+- `WaveFormManager`
+- Teile der `Middle Drag`-Logik in `ChartScreenMouseGesture`
 
-Wirkung:
+Das war zu invasiv. Ergebnis:
 
-- horizontales Panning darf nun im Zustand `recentRunThenStop` ebenfalls die
-  Bildschirm-Wellenform transformieren
-- die vorhandene Zoom-Assist-Schicht kann ihre sichtbaren Zeitbasis-Aenderungen
-  im gestoppten Zustand jetzt ebenfalls rendern
-
-Zusatzpatch fuer `Middle Drag`:
-
-- `ChartScreenMouseGesture.applyVerticalMiddlePan(...)` aktualisiert jetzt
-  zusaetzlich Cursor-/Pos0-Anzeigen (`computeYValues`, `updatePos0`,
-  `update_Pos0`), damit die UI bei vertikalem Verschieben konsistenter bleibt
+- Samples wurden nicht mehr korrekt angezeigt
+- Connect/Offline-Status zeigte fehlerhaftes Verhalten
+- die App war funktional regressiv
 
 ### Praktische Einschraenkung
 
-Die Timebase des eigentlichen Geraets ist weiterhin diskret.
-`Alt + Wheel` und `Shift + Middle Drag` liefern also eine deutlich bessere,
-interaktivere Bedienung, aber noch kein mathematisch komplett kontinuierliches
-"Pixel-perfect arbitrary zoom".
+Die Timebase des eigentlichen Geraets ist weiterhin diskret. Der aktuell
+funktionierende Patch verbessert bislang nur die horizontale Navigation im
+Stop-Modus; er fuehrt noch **keinen** neuen frei skalierbaren Software-Viewport
+ein.
 
 Fuer einen echten, komplett kontinuierlichen Viewport ueber gestoppte Samples
 waere ein tieferer Patch in der Render-/TimeScope-Schicht noetig, wahrscheinlich
@@ -382,8 +405,11 @@ eigenen frei skalierbaren Offline-Viewport zu erweitern.
 
 Noch nicht umgesetzt:
 
+- `Alt + Wheel`
 - Zoom-to-rectangle / rechteckige Auswahl auf dem Hauptchart
 - sauberer, expliziter "Viewport reset"-Shortcut fuer die neuen Gesten
+- `Middle Drag` fuer Panning
+- `Shift + Middle Drag` fuer horizontale Skalierung
 - separate, komplett kontinuierliche Offline-Ansicht nur fuer gestoppte Daten
 - Trackpad-freundliche Alternative zur mittleren Maustaste
 
