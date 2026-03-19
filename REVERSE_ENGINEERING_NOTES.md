@@ -468,7 +468,114 @@ Empfohlene naechste Schritte:
 - Backup der Original-JAR:
   - `.codex-work/backups/owon-vds-tiny-1.1.5-cf19.jar.orig`
 
-## 12. Kurzes Fazit
+## 12. Persistenz / Preferences
+
+Beim Analysieren von nicht gespeicherten UI-Einstellungen fiel ein wichtiger
+Architekturfehler in `WorkBenchTiny` auf.
+
+### Relevante Dateien
+
+- `com/owon/uppersoft/dso/global/WorkBenchTiny.java`
+- `com/owon/uppersoft/dso/global/ConfigFactoryTiny.java`
+- `com/owon/uppersoft/vds/core/pref/Config.java`
+- `com/owon/uppersoft/dso/global/ControlManager.java`
+- `com/owon/uppersoft/dso/view/TipsWindow.java`
+
+### Relevante Dateien auf Platte
+
+Unter macOS liegen die lokalen Settings hier:
+
+- `~/Library/Application Support/OWON VDS1022/preferences.ini`
+- `~/Library/Application Support/OWON VDS1022/preferences-default.ini`
+
+Beobachteter Zustand:
+
+- `preferences.ini` und `preferences-default.ini` koennen gleichzeitig existieren
+- `TipsWindowShow` lag in beiden Dateien auf `1`
+- `CH1.couplingIdx` / `CH2.couplingIdx` konnten sich zwischen beiden Dateien
+  unterscheiden
+
+### Wichtigste Erkenntnis
+
+`ConfigFactoryTiny.createConfig(...)` laedt beim Start zunaechst eine echte
+Session-Datei in `Config.sessionProperties`.
+
+`WorkBenchTiny` hat danach aber **zu spaet** noch einmal
+`preferences-default.ini` geladen und per `config.setSessionProperties(...)`
+eingesetzt, nachdem `CoreControlTiny`, `ControlManagerTiny` und der Rest der
+App bereits initialisiert worden waren.
+
+Dadurch entstanden zwei Probleme:
+
+- Ein Teil der App wurde mit den beim Start geladenen Werten initialisiert
+- spaetere `persist(...)`-Aufrufe liefen aber gegen ein anderes `Pref`-Objekt
+
+Das ist eine sehr wahrscheinliche Ursache fuer merkwuerdig inkonsistentes
+Persistenzverhalten.
+
+### Save-/Load-Semantik
+
+Wichtige Beobachtung:
+
+- `ControlManager.persist(pref)` schreibt nur in ein `Pref`-Objekt im Speicher
+- erst `Pref.store(...)` oder `Config.persist(...)` schreibt wirklich auf Platte
+
+Zusatzproblem im Originalfluss:
+
+- `WorkBenchTiny.exit()` schrieb `sessionProperties` direkt in
+  `preferences-default.ini`
+- davor wurde das `Pref`-Objekt aber **nicht** mit dem aktuellen Runtime-State
+  per `ctrlMgr.persist(pref)` aktualisiert
+
+Das bedeutet:
+
+- selbst wenn sich Runtime-Flags geaendert hatten, konnte
+  `preferences-default.ini` veraltete Werte enthalten
+
+### Implementierter Fix in dieser Session
+
+`WorkBenchTiny` wurde lokal so angepasst:
+
+1. Beim Start wird zuerst `preferences-default.ini` verwendet, falls sie
+   existiert.
+2. Nur wenn diese Datei fehlt, faellt der Start auf `preferences.ini` zurueck.
+3. Der spaete `config.setSessionProperties(...)`-Tausch im Konstruktor wurde
+   entfernt.
+4. Beim Beenden wird vor dem Schreiben von `preferences-default.ini` explizit
+   `ctrlMgr.persist(sessionProperties)` aufgerufen.
+
+Ziel des Fixes:
+
+- konsistenteres Laden der letzten Session
+- konsistenteres Schreiben der aktuellen Session
+- keine nachtraegliche Entkopplung zwischen geladenen und spaeter persistierten
+  `Pref`-Objekten
+
+### Tips-Dialog
+
+Der "Don't show again"-Schalter im Tips-Dialog macht lokal nur:
+
+- `cm.istipsWindowShow = !hiddenCb.isSelected()`
+
+Er persistiert **nicht direkt** selbst. Deshalb ist der korrekte Exit-/Save-Pfad
+entscheidend dafuer, dass `TipsWindowShow` spaeter wirklich auf `0` landet.
+
+### Wichtiger Debug-Hinweis
+
+Wenn wieder Persistenzprobleme auftauchen, zuerst beide Dateien vergleichen:
+
+- `preferences.ini`
+- `preferences-default.ini`
+
+Insbesondere diese Keys sind gute Indikatoren:
+
+- `TipsWindowShow`
+- `CH1.couplingIdx`
+- `CH2.couplingIdx`
+- `Timebase.index`
+- `HorTrgPos`
+
+## 13. Kurzes Fazit
 
 Trotz fehlender Original-Java-Quellen ist die App gezielt patchbar.
 Der sinnvollste Workflow ist:
